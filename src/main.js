@@ -26,12 +26,6 @@ const { data, ...indexes } = initData(sourceData);
  */
 function collectState() {
     const state = processFormData(new FormData(sampleTable.container));
-
-    const searchInput = document.querySelector('input[name="search"]');
-    if (searchInput) {
-        state.search = searchInput.value;
-    }
-
     const rowsPerPage = parseInt(state.rowsPerPage);
     const page = parseInt(state.page ?? 1);
 
