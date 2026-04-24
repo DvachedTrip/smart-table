@@ -7,25 +7,31 @@ import { initData } from "./data.js";
 import { processFormData } from "./lib/utils.js";
 
 import { initTable } from "./components/table.js";
-
 import { initPagination } from "./components/pagination.js";
-
 import { initSorting } from "./components/sorting.js";
-
 import { initFiltering } from "./components/filtering.js";
-
 import { initSearching } from "./components/searching.js";
-// @todo: подключение
 
-// Исходные данные используемые в render()
+// Исходные данные
 const { data, ...indexes } = initData(sourceData);
 
+// Таблица
+const sampleTable = initTable(
+    {
+        tableTemplate: "table",
+        rowTemplate: "row",
+        before: ["search", "header", "filter"],
+        after: ["pagination"],
+    },
+    render,
+);
+
 /**
- * Сбор и обработка полей из таблицы
- * @returns {Object}
+ * Сбор состояния формы
  */
 function collectState() {
     const state = processFormData(new FormData(sampleTable.container));
+
     const rowsPerPage = parseInt(state.rowsPerPage);
     const page = parseInt(state.page ?? 1);
 
@@ -37,65 +43,66 @@ function collectState() {
 }
 
 /**
- * Перерисовка состояния таблицы при любых изменениях
- * @param {HTMLButtonElement?} action
+ * Рендер
  */
 function render(action) {
-    let state = collectState(); // состояние полей из таблицы
-    let result = [...data]; // копируем для последующего изменения
-    // @todo: использование
-    result = applySearching(result, state);
+    const state = collectState();
+    let result = [...data];
 
-    result = applyFiltering(result, state, action);
+    result = applySearching(result, state);
+    result = applyFiltering(result, state);
     result = applySorting(result, state, action);
     result = applyPagination(result, state, action);
 
     sampleTable.render(result);
 }
 
-const sampleTable = initTable(
-    {
-        tableTemplate: "table",
-        rowTemplate: "row",
-        before: ["search", "header", "filter"],
-        after: ["pagination"],
-    },
-    render,
-);
+// --- ИНИЦИАЛИЗАЦИЯ МОДУЛЕЙ ---
 
-// @todo: инициализация
 const applySorting = initSorting([
-    // Нам нужно передать сюда массив элементов, которые вызывают сортировку, чтобы изменять их визуальное представление
     sampleTable.header.elements.sortByDate,
     sampleTable.header.elements.sortByTotal,
 ]);
 
 const applyPagination = initPagination(
-    sampleTable.pagination.elements, // передаём сюда элементы пагинации, найденные в шаблоне
+    sampleTable.pagination.elements,
     (el, page, isCurrent) => {
-        // и колбэк, чтобы заполнять кнопки страниц данными
         const input = el.querySelector("input");
         const label = el.querySelector("span");
+
         input.value = page;
         input.checked = isCurrent;
         label.textContent = page;
+
         return el;
     },
 );
 
-const applyFiltering = initFiltering(sampleTable.filter.elements, {
-    // передаём элементы фильтра
-    searchBySeller: indexes.sellers, // для элемента с именем searchBySeller устанавливаем массив продавцов
+const { applyFiltering, updateIndexes } = initFiltering(
+    sampleTable.filter.elements,
+    {
+        searchBySeller: indexes.sellers,
+    },
+);
+
+// заполняем select
+updateIndexes(sampleTable.filter.elements, {
+    searchBySeller: indexes.sellers,
 });
 
 const applySearching = initSearching("search");
 
+// --- МОНТИРОВАНИЕ ---
+
 const appRoot = document.querySelector("#app");
 appRoot.appendChild(sampleTable.container);
+
+// --- СОБЫТИЯ ПОИСКА ---
 
 const searchInput = document.querySelector('input[name="search"]');
 if (searchInput) {
     searchInput.addEventListener("input", () => render());
 }
 
+// первый рендер
 render();

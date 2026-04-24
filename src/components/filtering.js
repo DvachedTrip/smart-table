@@ -1,5 +1,8 @@
-// @todo: #4.3 — настроить компаратор
-export function initFiltering(elements) {
+import { createComparison, defaultRules } from "../lib/compare.js";
+
+export function initFiltering(elements, indexes) {
+    const compare = createComparison(defaultRules);
+
     const updateIndexes = (elements, indexes) => {
         Object.keys(indexes).forEach((elementName) => {
             elements[elementName].append(
@@ -13,27 +16,8 @@ export function initFiltering(elements) {
         });
     };
 
-    const applyFiltering = (query, state, action) => {
-        // код с обработкой очистки поля
-
-        // @todo: #4.5 — отфильтровать данные, используя компаратор
-        const filter = {};
-        Object.keys(elements).forEach((key) => {
-            if (elements[key]) {
-                if (
-                    ["INPUT", "SELECT"].includes(elements[key].tagName) &&
-                    elements[key].value
-                ) {
-                    // ищем поля ввода в фильтре с непустыми данными
-                    filter[`filter[${elements[key].name}]`] =
-                        elements[key].value; // чтобы сформировать в query вложенный объект фильтра
-                }
-            }
-        });
-
-        return Object.keys(filter).length
-            ? Object.assign({}, query, filter)
-            : query; // если в фильтре что-то добавилось, применим к запросу
+    const applyFiltering = (data, state) => {
+        return data.filter((row) => compare(row, state));
     };
 
     return {
