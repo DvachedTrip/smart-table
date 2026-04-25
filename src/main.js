@@ -1,7 +1,7 @@
 import "./fonts/ys-display/fonts.css";
 import "./style.css";
 
-import { data as sourceData } from "./data/dataset_1.js";
+import { data, data as sourceData } from "./data/dataset_1.js";
 
 import { initData } from "./data.js";
 import { processFormData } from "./lib/utils.js";
@@ -13,7 +13,42 @@ import { initFiltering } from "./components/filtering.js";
 import { initSearching } from "./components/searching.js";
 
 // Исходные данные
-const { data, ...indexes } = initData(sourceData);
+const api = initData(sourceData);
+
+/**
+ * Сбор и обработка полей из таблицы
+ * @returns {Object}
+ */
+function collectState() {
+    const state = processFormData(new FormData(sampleTable.container));
+    const rowsPerPage = parseInt(state.rowsPerPage); // приведём количество страниц к числу
+    const page = parseInt(state.page ?? 1); // номер страницы по умолчанию 1 и тоже число
+
+    return {
+        // расширьте существующий return вот так
+        ...state,
+        rowsPerPage,
+        page,
+    };
+    return {
+        ...state,
+    };
+}
+
+async function render(action) {
+    let state = collectState(); // состояние полей из таблицы
+    let query = {}; // здесь будут формироваться параметры запроса
+
+    query = applyPagination(query, state, action); // обновляем query
+    query = applyFiltering(query, state, action); // result заменяем на query
+    query = applySearching(query, state, action);
+    query = applySorting(query, state, action);
+
+    const { total, items } = await api.getRecords(query); // запрашиваем данные с собранными параметрами
+
+    updatePagination(total, query); // перерисовываем пагинатор
+    sampleTable.render(items);
+}
 
 // Таблица
 const sampleTable = initTable(
@@ -26,45 +61,9 @@ const sampleTable = initTable(
     render,
 );
 
-/**
- * Сбор состояния формы
- */
-function collectState() {
-    const state = processFormData(new FormData(sampleTable.container));
+const applySearching = initSearching("search");
 
-    const rowsPerPage = parseInt(state.rowsPerPage);
-    const page = parseInt(state.page ?? 1);
-
-    return {
-        ...state,
-        rowsPerPage,
-        page,
-    };
-}
-
-/**
- * Рендер
- */
-function render(action) {
-    const state = collectState();
-    let result = [...data];
-
-    result = applySearching(result, state);
-    result = applyFiltering(result, state);
-    result = applySorting(result, state, action);
-    result = applyPagination(result, state, action);
-
-    sampleTable.render(result);
-}
-
-// --- ИНИЦИАЛИЗАЦИЯ МОДУЛЕЙ ---
-
-const applySorting = initSorting([
-    sampleTable.header.elements.sortByDate,
-    sampleTable.header.elements.sortByTotal,
-]);
-
-const applyPagination = initPagination(
+const { applyPagination, updatePagination } = initPagination(
     sampleTable.pagination.elements,
     (el, page, isCurrent) => {
         const input = el.querySelector("input");
@@ -78,31 +77,22 @@ const applyPagination = initPagination(
     },
 );
 
-const { applyFiltering, updateIndexes } = initFiltering(
-    sampleTable.filter.elements,
-    {
-        searchBySeller: indexes.sellers,
-    },
-);
+const { applyFiltering, updateIndexes } = initFiltering(sampleTable.filter.elements)
 
-// заполняем select
-updateIndexes(sampleTable.filter.elements, {
-    searchBySeller: indexes.sellers,
-});
-
-const applySearching = initSearching("search");
-
-// --- МОНТИРОВАНИЕ ---
+const applySorting = initSorting([
+    sampleTable.header.elements.sortByDate,
+    sampleTable.header.elements.sortByTotal,
+]);
 
 const appRoot = document.querySelector("#app");
 appRoot.appendChild(sampleTable.container);
 
-// --- СОБЫТИЯ ПОИСКА ---
+async function init() {
+    const indexes = await api.getIndexes();
 
-const searchInput = document.querySelector('input[name="search"]');
-if (searchInput) {
-    searchInput.addEventListener("input", () => render());
+    updateIndexes(sampleTable.filter.elements, {
+        searchBySeller: indexes.sellers
+    });
 }
 
-// первый рендер
-render();
+init().then(render);
